@@ -121,9 +121,9 @@ const DEFAULT_MODELS: Record<Provider, string> = {
 export function Welcome() {
   console.log('');
   console.log(chalk.cyan.bold('  ╔══════════════════════════════════╗'));
-  console.log(chalk.cyan.bold('  ║') + chalk.white.bold('           D E V R A              ') + chalk.cyan.bold('║'));
+  console.log(chalk.cyan.bold('  ║') + chalk.white.bold('        H A R N E S S L Y         ') + chalk.cyan.bold('║'));
   console.log(chalk.cyan.bold('  ╚══════════════════════════════════╝'));
-  console.log(chalk.gray('    Your AI-powered coding agent'));
+  console.log(chalk.gray('    Your harnessed AI coding agent'));
   console.log(chalk.dim('    Type "exit" to quit | Ctrl+C to cancel'));
   console.log('');
 }

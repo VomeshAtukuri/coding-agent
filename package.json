@@ -1,14 +1,26 @@
 {
-  "name": "devra",
+  "name": "harnessly",
   "version": "1.0.0",
-  "description": "A coding agent that can help you with your coding tasks through a CLI",
+  "description": "A harnessed AI coding agent CLI with guardrails, approval flow, observability, and error recovery",
   "main": "build/index.js",
+  "types": "build/index.d.ts",
   "bin": {
-    "devra": "./build/index.js"
+    "harnessly": "./build/index.js"
   },
   "files": [
     "build"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VomeshAtukuri/coding-agent.git"
+  },
+  "homepage": "https://github.com/VomeshAtukuri/coding-agent#readme",
+  "bugs": {
+    "url": "https://github.com/VomeshAtukuri/coding-agent/issues"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
@@ -19,10 +31,17 @@
   "keywords": [
     "coding",
     "agent",
-    "cli"
+    "cli",
+    "ai",
+    "harness",
+    "guardrails",
+    "approval",
+    "observability",
+    "llm",
+    "terminal"
   ],
   "author": "Vomesh",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.42",

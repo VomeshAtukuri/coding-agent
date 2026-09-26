@@ -6,7 +6,7 @@ import readline from 'readline';
 import { Agent, createModel, type ApprovalCallback } from './agent';
 import { appendHistory, clearHistory, deleteConfig, getConfig, getHistory, saveConfig } from './config';
 import { getSessionTokens, resetSessionTokens, getLogPath } from './harness';
-import { SelectProvider, Welcome } from './ui';
+import { SelectProvider, Welcome, type ProviderConfig } from './ui';
 
 function createPrompt() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -21,13 +21,26 @@ function createPrompt() {
     };
 }
 
-const cli = cac('devra');
+const cli = cac('harnessly');
+
+function tryEnvConfig(): ProviderConfig | null {
+    if (process.env.OPENAI_API_KEY) {
+        return { provider: 'OpenAI', apiKey: process.env.OPENAI_API_KEY, model: 'gpt-4o' };
+    }
+    if (process.env.ANTHROPIC_API_KEY) {
+        return { provider: 'Anthropic', apiKey: process.env.ANTHROPIC_API_KEY, model: 'claude-sonnet-4-5' };
+    }
+    if (process.env.AZURE_API_KEY && process.env.AZURE_RESOURCE_NAME) {
+        return { provider: 'Azure', apiKey: process.env.AZURE_API_KEY, model: 'gpt-4o', resourceName: process.env.AZURE_RESOURCE_NAME };
+    }
+    return null;
+}
 
 cli.command('', 'Start the coding agent').action(async () => {
     Welcome();
     let config = getConfig();
     if(!config){
-        config = await SelectProvider();
+        config = tryEnvConfig() ?? await SelectProvider();
         saveConfig(config);
     } else {
         console.log(chalk.dim(`  Provider: ${config.provider} | Model: ${config.model || 'default'}`));

@@ -12,6 +12,20 @@ import type { ProviderConfig } from './ui';
 import { createTools } from './tools';
 import { trackTokens, getSessionTokens, resetSessionTokens, withRetry } from './harness';
 
+function getEnvKeyName(provider: string): string {
+  switch (provider) {
+    case 'OpenAI': return 'OPENAI_API_KEY';
+    case 'Anthropic': return 'ANTHROPIC_API_KEY';
+    case 'Azure': return 'AZURE_API_KEY';
+    case 'Custom': return 'CUSTOM_API_KEY';
+    default: return `${provider.toUpperCase()}_API_KEY`;
+  }
+}
+
+function getEnvKey(provider: string): string | undefined {
+  return process.env[getEnvKeyName(provider)];
+}
+
 export type ApprovalCallback = (toolName: string, args: any) => Promise<boolean>;
 
 interface AskArgs {
@@ -42,7 +56,12 @@ Guidelines:
 - If a task requires multiple steps, do them all in one turn.`;
 
 export function createModel(config: ProviderConfig): LanguageModel {
-  const { provider, apiKey, model, resourceName, baseURL } = config;
+  const { provider, model, resourceName, baseURL } = config;
+
+  const apiKey = config.apiKey || getEnvKey(provider);
+  if (!apiKey) {
+    throw new Error(`No API key found. Set ${getEnvKeyName(provider)} env var or run setup.`);
+  }
 
   switch (provider) {
     case 'OpenAI': {

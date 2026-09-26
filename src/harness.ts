@@ -50,8 +50,8 @@ export function checkCommand(command: string): { allowed: boolean; reason?: stri
 
 // ─── Step Logging (Observability) ────────────────────────
 
-const LOG_DIR = path.join(os.homedir(), '.coding-agent', 'logs');
-const LOG_PATH = path.join(LOG_DIR, `devra-${new Date().toISOString().slice(0, 10)}.log`);
+const LOG_DIR = path.join(os.homedir(), '.harnessly', 'logs');
+const LOG_PATH = path.join(LOG_DIR, `harnessly-${new Date().toISOString().slice(0, 10)}.log`);
 
 interface LogEntry {
     timestamp: string;

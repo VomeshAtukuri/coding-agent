@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import type { ProviderConfig } from './ui';
 
-const CONFIG_DIR = path.join(os.homedir(), '.coding-agent');
+const CONFIG_DIR = path.join(os.homedir(), '.harnessly');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 const HISTORY_PATH = path.join(CONFIG_DIR, 'history.json');
 
