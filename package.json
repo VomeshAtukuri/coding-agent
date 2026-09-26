@@ -1,11 +1,11 @@
 {
   "name": "harnessly",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A harnessed AI coding agent CLI with guardrails, approval flow, observability, and error recovery",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "bin": {
-    "harnessly": "./build/index.js"
+    "harnessly": "build/index.js"
   },
   "files": [
     "build"
