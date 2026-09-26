@@ -131,7 +131,7 @@ cli.command('', 'Start the coding agent').action(async () => {
             console.log(chalk.dim('    /history  - Show recent prompts'));
             console.log(chalk.dim('    /tokens   - Show token usage'));
             console.log(chalk.dim('    /logs     - Show log file path'));
-            console.log(chalk.dim('    /exit     - Quit Devra'));
+            console.log(chalk.dim('    /exit     - Quit Harnessly'));
             console.log('');
             continue;
         }
@@ -151,7 +151,7 @@ cli.command('', 'Start the coding agent').action(async () => {
             for await (const chunk of textStream) {
                 if (firstChunk) {
                     spinner.stop();
-                    process.stdout.write(`\n${chalk.green('Devra:')} `);
+                    process.stdout.write(`\n${chalk.green('Harnessly:')} `);
                     firstChunk = false;
                 }
                 process.stdout.write(chunk);
@@ -179,5 +179,5 @@ function formatArgs(args: any): string {
 }
 
 cli.help();
-cli.version('1.0.0');
+cli.version('1.0.1');
 cli.parse();

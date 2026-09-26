@@ -10,7 +10,7 @@ import {
 } from 'ai';
 import type { ProviderConfig } from './ui';
 import { createTools } from './tools';
-import { trackTokens, getSessionTokens, resetSessionTokens, withRetry } from './harness';
+import { trackTokens, withRetry } from './harness';
 
 function getEnvKeyName(provider: string): string {
   switch (provider) {
