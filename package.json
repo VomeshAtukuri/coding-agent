@@ -1,0 +1,44 @@
+{
+  "name": "devra",
+  "version": "1.0.0",
+  "description": "A coding agent that can help you with your coding tasks through a CLI",
+  "main": "build/index.js",
+  "bin": {
+    "devra": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "start": "node build/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "coding",
+    "agent",
+    "cli"
+  ],
+  "author": "Vomesh",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.42",
+    "@ai-sdk/azure": "^4.0.42",
+    "@ai-sdk/openai": "^4.0.41",
+    "@clack/prompts": "^1.7.0",
+    "ai": "^7.0.65",
+    "cac": "^7.0.0",
+    "chalk": "^6.0.0",
+    "ora": "^9.4.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
