@@ -2,12 +2,15 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import {
     checkPath,
     checkCommand,
     logToolCall,
 } from './harness';
+
+const execAsync = promisify(exec);
 
 const MAX_OUTPUT_LENGTH = 10000;
 
@@ -18,9 +21,9 @@ function truncate(text: string, limit = MAX_OUTPUT_LENGTH): string {
 }
 
 export function createTools() {
-    function timedExecute(toolName: string, input: any, fn: () => string): string {
+    async function timedExecute(toolName: string, input: any, fn: () => string | Promise<string>): Promise<string> {
         const start = Date.now();
-        const result = fn();
+        const result = await fn();
         const durationMs = Date.now() - start;
         logToolCall({
             timestamp: new Date().toISOString(),
@@ -107,14 +110,15 @@ export function createTools() {
                 const cmdCheck = checkCommand(command);
                 if (!cmdCheck.allowed) return cmdCheck.reason!;
 
-                return timedExecute('runCommand', { command }, () => {
+                return timedExecute('runCommand', { command }, async () => {
                     try {
-                        const output = execSync(command, {
+                        const { stdout } = await execAsync(command, {
                             encoding: 'utf-8',
                             timeout: 30000,
                             cwd: process.cwd(),
+                            maxBuffer: 1024 * 1024,
                         });
-                        return truncate(output || '(no output)');
+                        return truncate(stdout || '(no output)');
                     } catch (e: any) {
                         return `Command failed: ${e.message}\n${e.stdout || ''}${e.stderr || ''}`;
                     }
@@ -132,13 +136,13 @@ export function createTools() {
                 const pathCheck = checkPath(dirPath);
                 if (!pathCheck.allowed) return pathCheck.reason!;
 
-                return timedExecute('searchFiles', { pattern, dirPath }, () => {
+                return timedExecute('searchFiles', { pattern, dirPath }, async () => {
                     try {
-                        const output = execSync(
+                        const { stdout } = await execAsync(
                             `findstr /s /n /i "${pattern}" "${path.resolve(dirPath)}\\*"`,
-                            { encoding: 'utf-8', timeout: 15000 }
+                            { encoding: 'utf-8', timeout: 15000, maxBuffer: 1024 * 1024 }
                         );
-                        return truncate(output || 'No matches found.');
+                        return truncate(stdout || 'No matches found.');
                     } catch (e: any) {
                         if (e.status === 1) return 'No matches found.';
                         return `Search error: ${e.message}`;

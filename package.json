@@ -1,6 +1,6 @@
 {
   "name": "harnessly",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A harnessed AI coding agent CLI with guardrails, approval flow, observability, and error recovery",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -46,6 +46,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.42",
     "@ai-sdk/azure": "^4.0.42",
+    "@ai-sdk/google": "^4.0.42",
     "@ai-sdk/openai": "^4.0.41",
     "@clack/prompts": "^1.7.0",
     "ai": "^7.0.65",

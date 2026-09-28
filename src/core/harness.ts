@@ -1,10 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
-
-// ─── Directory Scoping ───────────────────────────────────
-
-const WORKING_DIR = process.cwd();
+import { WORKING_DIR, LOG_DIR, LOG_PATH, ensureDir } from '../config/paths';
 
 function isWithinWorkingDir(targetPath: string): boolean {
     const resolved = path.resolve(targetPath);
@@ -37,6 +33,7 @@ const DANGEROUS_PATTERNS: { pattern: RegExp; reason: string }[] = [
     { pattern: /\breboot\b/i, reason: 'System reboot command' },
     { pattern: /\btaskkill\s+\/f/i, reason: 'Force kill all processes' },
     { pattern: /\breg\s+delete/i, reason: 'Registry deletion' },
+    { pattern: /\b(cls|clear)\b/i, reason: 'Screen clear command (use /cls instead)' },
 ];
 
 export function checkCommand(command: string): { allowed: boolean; reason?: string } {
@@ -50,9 +47,6 @@ export function checkCommand(command: string): { allowed: boolean; reason?: stri
 
 // ─── Step Logging (Observability) ────────────────────────
 
-const LOG_DIR = path.join(os.homedir(), '.harnessly', 'logs');
-const LOG_PATH = path.join(LOG_DIR, `harnessly-${new Date().toISOString().slice(0, 10)}.log`);
-
 interface LogEntry {
     timestamp: string;
     tool: string;
@@ -61,12 +55,9 @@ interface LogEntry {
     durationMs: number;
 }
 
-function ensureLogDir() {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-}
 
 export function logToolCall(entry: LogEntry) {
-    ensureLogDir();
+    ensureDir(LOG_DIR);
     const line = `[${entry.timestamp}] ${entry.tool} (${entry.durationMs}ms)\n  input: ${JSON.stringify(entry.input).slice(0, 200)}\n  result: ${entry.result.slice(0, 200)}\n\n`;
     fs.appendFileSync(LOG_PATH, line);
 }

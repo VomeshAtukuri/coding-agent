@@ -1,14 +1,31 @@
 # Harnessly
 
-A harnessed AI coding agent CLI with guardrails, approval flow, observability, and error recovery. Harnessly can read files, write files, run commands, and search code — all driven by natural language, with safety guardrails wrapping every action.
+> A harnessed AI coding agent that works inside your terminal.
+
+[![npm version](https://img.shields.io/npm/v/harnessly)](https://www.npmjs.com/package/harnessly)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Harnessly works inside a local workspace: it reads and edits files, runs commands, searches code, and carries a task through validation. Conversations, config, history, logs, and traces remain on your machine under `~/.harnessly/`.
+
+The project is a TypeScript monorepo with a single runtime shared across all surfaces. The CLI is the primary client of the core harness layer — guardrails, observability, and error recovery.
+
+Local-first does not mean offline: model requests send the content needed for a task to the providers you configure. Harnessly does not operate a hosted account or synchronization backend.
+
+### Quick Start
+
+```bash
+npx harnessly
+```
+
+That's it. On first run, pick your provider, paste your API key, and start coding.
 
 ## Features
 
 ### Agent
-- **Multi-provider support** — OpenAI, Azure, Anthropic, or any custom OpenAI-compatible endpoint
-- **Streaming responses** — Token-by-token output in real time
+- **Multi-provider support** — OpenAI, Azure, Anthropic, Google, or any custom OpenAI-compatible endpoint
+- **Streaming responses** — Token-by-token output with markdown formatting
 - **Conversation memory** — Maintains context across turns with auto-summarization
-- **Up to 8 tool calls per turn** — Chained reasoning with tool feedback
+- **Up to 15 tool calls per turn** — Chained reasoning with tool feedback
 
 ### Harness (Safety & Observability)
 - **Guardrails**
@@ -42,7 +59,7 @@ harnessly
 ### First Run Setup
 
 On first run, Harnessly will prompt you to:
-1. Select your AI provider (OpenAI, Azure, Anthropic, or Custom)
+1. Select your AI provider (OpenAI, Azure, Anthropic, Google, or Custom)
 2. Enter your API key (masked input)
 3. Choose a model (or use the default)
 
@@ -61,6 +78,10 @@ harnessly
 export ANTHROPIC_API_KEY=sk-ant-...
 harnessly
 
+# Google
+export GOOGLE_API_KEY=...
+harnessly
+
 # Azure
 export AZURE_API_KEY=...
 export AZURE_RESOURCE_NAME=my-resource
@@ -72,11 +93,13 @@ harnessly
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
+| `/about` | About Harnessly |
 | `/tokens` | Display session token usage |
 | `/logs` | Show log file path |
 | `/clear` | Clear conversation history and reset tokens |
 | `/config` | Switch provider or model |
 | `/history` | Show recent prompt history |
+| `/cls` | Clear the terminal screen |
 | `/exit` | Exit Harnessly |
 
 ## Examples
@@ -109,17 +132,17 @@ harnessly
 
 ```
 ┌─────────────────────────────────────────┐
-│           HARNESS LAYER                  │
+│           HARNESS LAYER                 │
 │  ┌───────────────────────────────────┐  │
-│  │         AGENT (LLM)                │  │
+│  │         AGENT (LLM)               │  │
 │  │  ┌─────┐  ┌──────┐  ┌──────────┐  │  │
 │  │  │Tools│  │Memory│  │Reasoning │  │  │
 │  │  └─────┘  └──────┘  └──────────┘  │  │
 │  └───────────────────────────────────┘  │
-│                                          │
+│                                         │
 │  Guardrails   ✅ Observability          │
 │  Approval     ✅ Token Tracking         │
-│  Retry         ✅ Step Logging          │
+│  Retry        ✅ Step Logging         │
 └─────────────────────────────────────────┘
 ```
 
@@ -128,8 +151,8 @@ harnessly
 3. The AI model decides which tools to use and calls them
 4. **Harness layer checks**: Is this tool destructive? → Prompt user. Is this command dangerous? → Block. Is this path outside working dir? → Deny.
 5. Approved tool calls execute and results go back to the model
-6. The model can chain up to 8 tool calls per turn
-7. Final response is displayed with token usage
+6. The model can chain up to 15 tool calls per turn
+7. Final response is formatted with markdown and displayed with token usage
 
 ## Configuration
 
@@ -144,6 +167,25 @@ Config is stored at `~/.harnessly/config.json`:
 ```
 
 To reconfigure, delete the config file and restart Harnessly, or use `/config` to switch providers.
+
+## Project Structure
+
+```
+src/
+  index.ts              # Entry point — CLI setup, main loop, stream handling
+  core/
+    agent.ts            # AI agent — model creation, streaming, tool execution
+    tools.ts            # Tool definitions — readFile, writeFile, runCommand, etc.
+    harness.ts          # Safety, logging, retry, token tracking
+  cli/
+    commands.ts         # Slash commands (/config, /clear, /help, etc.)
+    errors.ts           # Error handler with user-friendly messages
+    markdown.ts         # Markdown-to-terminal formatter
+    ui.ts               # Provider selection, welcome banner
+  config/
+    config.ts           # Config + history persistence
+    paths.ts            # Shared path constants
+```
 
 ## Development
 

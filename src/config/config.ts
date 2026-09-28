@@ -1,15 +1,6 @@
 import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import type { ProviderConfig } from './ui';
-
-const CONFIG_DIR = path.join(os.homedir(), '.harnessly');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
-const HISTORY_PATH = path.join(CONFIG_DIR, 'history.json');
-
-function ensureDir() {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-}
+import { CONFIG_PATH, HISTORY_PATH, ensureDir } from './paths';
+import type { ProviderConfig } from '../cli/ui';
 
 // ─── Config ──────────────────────────────────────────────
 
@@ -51,10 +42,6 @@ export function appendHistory(entry: string) {
     // keep last 100 entries
     const trimmed = history.slice(-100);
     fs.writeFileSync(HISTORY_PATH, JSON.stringify(trimmed, null, 2));
-}
-
-export function getConfigDir() {
-    return CONFIG_DIR;
 }
 
 export function clearHistory() {

@@ -3,13 +3,16 @@ import { cac } from 'cac';
 import chalk from 'chalk';
 import ora from 'ora';
 import readline from 'readline';
-import { Agent, createModel, type ApprovalCallback } from './agent';
-import { appendHistory, clearHistory, deleteConfig, getConfig, getHistory, saveConfig } from './config';
-import { getSessionTokens, resetSessionTokens, getLogPath } from './harness';
-import { SelectProvider, Welcome, type ProviderConfig } from './ui';
+import { Agent, createModel, type ApprovalCallback } from './core/agent';
+import { appendHistory, getConfig, saveConfig } from './config/config';
+import { getSessionTokens } from './core/harness';
+import { SelectProvider, Welcome, type ProviderConfig } from './cli/ui';
+import { formatMarkdown } from './cli/markdown';
+import { handleError } from './cli/errors';
+import { handleCommand } from './cli/commands';
 
 function createPrompt() {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    let rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     return {
         ask(query: string): Promise<string | null> {
             return new Promise((resolve) => {
@@ -17,21 +20,35 @@ function createPrompt() {
                 rl.once('close', () => resolve(null));
             });
         },
-        close() { rl.close(); }
+        close() { rl.close(); },
+        release() { rl.close(); },
+        reacquire() { rl = readline.createInterface({ input: process.stdin, output: process.stdout }); }
     };
 }
 
 const cli = cac('harnessly');
 
+const ENV_PROVIDERS: { envKey: string; provider: ProviderConfig['provider']; model: string; extra?: Record<string, string> }[] = [
+    { envKey: 'OPENAI_API_KEY', provider: 'OpenAI', model: 'gpt-4o' },
+    { envKey: 'ANTHROPIC_API_KEY', provider: 'Anthropic', model: 'claude-sonnet-4-5' },
+    { envKey: 'AZURE_API_KEY', provider: 'Azure', model: 'gpt-4o', extra: { resourceName: 'AZURE_RESOURCE_NAME' } },
+    { envKey: 'GOOGLE_API_KEY', provider: 'Google', model: 'gemini-2.5-flash' },
+];
+
 function tryEnvConfig(): ProviderConfig | null {
-    if (process.env.OPENAI_API_KEY) {
-        return { provider: 'OpenAI', apiKey: process.env.OPENAI_API_KEY, model: 'gpt-4o' };
-    }
-    if (process.env.ANTHROPIC_API_KEY) {
-        return { provider: 'Anthropic', apiKey: process.env.ANTHROPIC_API_KEY, model: 'claude-sonnet-4-5' };
-    }
-    if (process.env.AZURE_API_KEY && process.env.AZURE_RESOURCE_NAME) {
-        return { provider: 'Azure', apiKey: process.env.AZURE_API_KEY, model: 'gpt-4o', resourceName: process.env.AZURE_RESOURCE_NAME };
+    for (const p of ENV_PROVIDERS) {
+        const apiKey = process.env[p.envKey];
+        if (!apiKey) continue;
+        if (p.extra) {
+            const extraVals: Record<string, string> = {};
+            for (const [k, envVar] of Object.entries(p.extra)) {
+                if (!process.env[envVar]) continue;
+                extraVals[k] = process.env[envVar]!;
+            }
+            if (Object.keys(extraVals).length < Object.keys(p.extra).length) continue;
+            return { provider: p.provider, apiKey, model: p.model, ...extraVals };
+        }
+        return { provider: p.provider, apiKey, model: p.model };
     }
     return null;
 }
@@ -52,6 +69,19 @@ cli.command('', 'Start the coding agent').action(async () => {
 
     let spinner: any = null;
 
+    // Graceful Ctrl+C handling — stop spinner, close prompt, exit cleanly
+    let isShuttingDown = false;
+    const handleInterrupt = () => {
+        if (isShuttingDown) return;
+        isShuttingDown = true;
+        if (spinner) spinner.stop();
+        prompt.close();
+        console.log(chalk.dim('\n  Interrupted. Goodbye!\n'));
+        process.exit(0);
+    };
+    process.on('SIGINT', handleInterrupt);
+    process.on('SIGTERM', handleInterrupt);
+
     const DESTRUCTIVE = new Set(['writeFile', 'runCommand']);
 
     const approval: ApprovalCallback = async (toolName, args) => {
@@ -66,6 +96,7 @@ cli.command('', 'Start the coding agent').action(async () => {
     };
 
     let agent = new Agent(model, { approval });
+    let currentModel = model;
 
     while(true) {
         const input = await prompt.ask(chalk.cyan('>>> '));
@@ -79,60 +110,18 @@ cli.command('', 'Start the coding agent').action(async () => {
 
         const cmd = input.trim();
 
-        if(cmd === '/config') {
-            deleteConfig();
-            config = await SelectProvider();
-            saveConfig(config);
-            model = createModel(config);
-            agent = new Agent(model, { approval });
-            console.log(chalk.green('  Config updated!\n'));
-            continue;
-        }
-
-        if(cmd === '/clear') {
-            agent = new Agent(model, { approval });
-            clearHistory();
-            resetSessionTokens();
-            console.log(chalk.dim('  Conversation cleared.\n'));
-            continue;
-        }
-
-        if(cmd === '/history') {
-            const history = getHistory();
-            if(history.length === 0) {
-                console.log(chalk.dim('  No history yet.\n'));
-            } else {
-                console.log(chalk.dim('  Recent prompts:'));
-                history.slice(-10).forEach((h, i) => {
-                    console.log(chalk.dim(`    ${i + 1}. ${h}`));
-                });
-                console.log('');
-            }
-            continue;
-        }
-
-        if(cmd === '/tokens') {
-            const usage = getSessionTokens();
-            console.log(chalk.dim(`  Tokens: ${usage.totalTokens.toLocaleString()} (in: ${usage.inputTokens.toLocaleString()}, out: ${usage.outputTokens.toLocaleString()})\n`));
-            continue;
-        }
-
-        if(cmd === '/logs') {
-            console.log(chalk.dim(`  Log file: ${getLogPath()}\n`));
-            continue;
-        }
-
-        if(cmd === '/help') {
-            console.log('');
-            console.log(chalk.cyan('  Available commands:'));
-            console.log(chalk.dim('    /help     - Show this help'));
-            console.log(chalk.dim('    /config   - Change provider/model'));
-            console.log(chalk.dim('    /clear    - Reset conversation'));
-            console.log(chalk.dim('    /history  - Show recent prompts'));
-            console.log(chalk.dim('    /tokens   - Show token usage'));
-            console.log(chalk.dim('    /logs     - Show log file path'));
-            console.log(chalk.dim('    /exit     - Quit Harnessly'));
-            console.log('');
+        if(cmd.startsWith('/')) {
+            const handled = await handleCommand(cmd, {
+                agent,
+                model: currentModel,
+                config,
+                approval,
+                prompt,
+                setAgent: (a) => { agent = a; },
+                setConfig: (c) => { config = c; currentModel = createModel(c); },
+            });
+            if (handled) continue;
+            console.log(chalk.red(`\n  Unknown command: ${cmd} | /help for available commands\n`));
             continue;
         }
 
@@ -146,26 +135,49 @@ cli.command('', 'Start the coding agent').action(async () => {
         };
 
         try {
-            const { textStream, done } = await agent.ask({ userMessage: input, onToolCall });
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 60000);
+
+            const { textStream, done } = await agent.ask({ userMessage: input, onToolCall, signal: controller.signal });
             let firstChunk = true;
-            for await (const chunk of textStream) {
+
+            // Suppress AI SDK's internal error logging to stderr
+            const originalStderrWrite = process.stderr.write.bind(process.stderr);
+            process.stderr.write = (() => true) as any;
+
+            try {
+                let buffer = '';
+                for await (const chunk of textStream) {
+                    if (firstChunk) {
+                        spinner.stop();
+                        firstChunk = false;
+                    }
+                    buffer += chunk;
+                }
                 if (firstChunk) {
                     spinner.stop();
-                    process.stdout.write(`\n${chalk.green('Harnessly:')} `);
-                    firstChunk = false;
                 }
-                process.stdout.write(chunk);
+                const fallbackText = await done();
+                if (fallbackText) {
+                    buffer += fallbackText;
+                }
+                if (buffer.trim()) {
+                    process.stdout.write(`\n${chalk.green('Harnessly:')}\n`);
+                    process.stdout.write(formatMarkdown(buffer) + '\n');
+                } else {
+                    process.stdout.write('\n');
+                }
+                const usage = getSessionTokens();
+                console.log(chalk.dim(`  tokens: ${usage.totalTokens.toLocaleString()} | /help for commands`));
+                process.stdout.write('\n');
+            } finally {
+                process.stderr.write = originalStderrWrite;
+                clearTimeout(timeout);
             }
-            if (firstChunk) spinner.stop();
-            process.stdout.write('\n');
-            await done();
-            const usage = getSessionTokens();
-            console.log(chalk.dim(`  tokens: ${usage.totalTokens.toLocaleString()} | /help for commands`));
-            process.stdout.write('\n');
         } catch (err: any) {
             spinner?.stop();
             spinner = null;
-            console.log(chalk.red(`\nError: ${err.message}\n`));
+            handleError(err);
         }
     }
 });
@@ -179,5 +191,5 @@ function formatArgs(args: any): string {
 }
 
 cli.help();
-cli.version('1.0.2');
+cli.version('1.0.3');
 cli.parse();

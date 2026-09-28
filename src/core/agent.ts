@@ -1,6 +1,7 @@
 import { createAzure } from '@ai-sdk/azure';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogle } from '@ai-sdk/google';
 import {
   generateText,
   streamText,
@@ -8,7 +9,7 @@ import {
   type ModelMessage,
   type LanguageModel,
 } from 'ai';
-import type { ProviderConfig } from './ui';
+import type { ProviderConfig } from '../cli/ui';
 import { createTools } from './tools';
 import { trackTokens, withRetry } from './harness';
 
@@ -17,6 +18,7 @@ function getEnvKeyName(provider: string): string {
     case 'OpenAI': return 'OPENAI_API_KEY';
     case 'Anthropic': return 'ANTHROPIC_API_KEY';
     case 'Azure': return 'AZURE_API_KEY';
+    case 'Google': return 'GOOGLE_API_KEY';
     case 'Custom': return 'CUSTOM_API_KEY';
     default: return `${provider.toUpperCase()}_API_KEY`;
   }
@@ -53,7 +55,8 @@ Guidelines:
 - Read files before modifying them to understand the current state.
 - After making changes, verify them if possible (e.g. run tests, check output).
 - Be concise in your responses. Show what you did, not lengthy explanations.
-- If a task requires multiple steps, do them all in one turn.`;
+- If a task requires multiple steps, do them all in one turn.
+- CRITICAL: After using tools, you MUST provide a text response summarizing what you found or did. Never end your turn with only tool calls — always respond with text.`;
 
 export function createModel(config: ProviderConfig): LanguageModel {
   const { provider, model, resourceName, baseURL } = config;
@@ -77,6 +80,10 @@ export function createModel(config: ProviderConfig): LanguageModel {
       // not createOpenAI (which would call OpenAI's endpoint with the wrong key/shape).
       const anthropic = createAnthropic({ apiKey });
       return anthropic(model || 'claude-sonnet-4-5');
+    }
+    case 'Google': {
+      const google = createGoogle({ apiKey });
+      return google.chat(model || 'gemini-2.5-flash');
     }
     case 'Custom': {
       const custom = createOpenAI({ apiKey, baseURL });
@@ -158,7 +165,7 @@ export class Agent {
         system: SYSTEM_PROMPT,
         messages: this.messages,
         tools: this.tools,
-        stopWhen: stepCountIs(8),
+        stopWhen: stepCountIs(15),
         abortSignal: signal,
         toolApproval: this.approval ? async ({ toolCall }: any) => {
           const approved = await this.approval!(toolCall.toolName, toolCall.input);
@@ -171,16 +178,43 @@ export class Agent {
         },
       })));
 
+      let hasText = false;
+      const textStream = (async function* () {
+        for await (const chunk of result.textStream) {
+          hasText = true;
+          yield chunk;
+        }
+      })();
+
       return {
-        textStream: result.textStream,
+        textStream,
         done: async () => {
           try {
             const response = await result.response;
             this.messages.push(...response.messages);
 
-            // Track token usage
+            // Track token usage — handle Google's format which uses inputTokenDetails/outputTokenDetails
             const usage = await result.totalUsage;
-            trackTokens(usage);
+            const inputTokens = usage.inputTokens ?? 0;
+            const outputTokens = usage.outputTokens ?? 0;
+            const totalTokens = usage.totalTokens ?? (inputTokens + outputTokens);
+            trackTokens({ inputTokens, outputTokens, totalTokens });
+
+            // Fallback: if the model only made tool calls without producing text,
+            // generate a response from the conversation so far.
+            if (!hasText) {
+              try {
+                const { text } = await generateText({
+                  model: this.model,
+                  system: SYSTEM_PROMPT,
+                  messages: this.messages,
+                });
+                this.messages.push({ role: 'assistant', content: text });
+                return text;
+              } catch {
+                return `Tool calls completed but no text response was generated. (${response.messages.length} messages in response)`;
+              }
+            }
 
             if (this.messages.length > MAX_MESSAGES) {
               await this.summarize();
